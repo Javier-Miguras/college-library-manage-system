@@ -10,16 +10,12 @@ use App\Http\Controllers\CampusProgramController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CityController;
 use App\Http\Controllers\ReservationController;
-use App\Http\Controllers\TestController;
 use App\Http\Controllers\TownController;
 use App\Http\Controllers\UserController;
 use App\Models\CampusProgram;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('auth:sanctum')->group(function () {
-
-    //Test
-    Route::get('/test', [TestController::class, 'index']);
 
     //User
     Route::get('/users/{user}', [UserController::class, 'show']);
