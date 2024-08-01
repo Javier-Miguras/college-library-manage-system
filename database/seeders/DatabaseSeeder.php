@@ -59,8 +59,8 @@ class DatabaseSeeder extends Seeder
         //     StudentProgramSeeder::class
         // ]);
 
-        $this->call([
-            ReservationSeeder::class
-        ]);
+        // $this->call([
+        //     ReservationSeeder::class
+        // ]);
     }
 }
