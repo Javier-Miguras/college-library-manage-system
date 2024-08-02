@@ -17,6 +17,7 @@ use App\Models\BookStock;
 use App\Models\Campus;
 use App\Models\Reservation;
 use App\Models\User;
+use App\Notifications\ReservationNotification;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -52,7 +53,7 @@ class ReservationController extends Controller
     {   
         $data = $request->validated();
 
-        $user = Auth::user();
+        $user = User::find(Auth::user()->id);
 
         if($user->role == 2){
             $campus_id = $data['campus_id'];
@@ -83,6 +84,8 @@ class ReservationController extends Controller
             $bookStock->save();
 
             DB::commit();
+
+            $user->notify(new ReservationNotification($reservation));
 
             return response()->json([
                 "message" => "Reservation created successfully",
@@ -134,6 +137,7 @@ class ReservationController extends Controller
     public function pickUpReservation(PickUpReservationRequest $request, Reservation $reservation)
     {
         $data = $request->validated();
+        $user = $reservation->user;
 
         if(!$reservation){
             return response()->json([
@@ -151,6 +155,8 @@ class ReservationController extends Controller
         $reservation->status = $data['status'];
         $reservation->save();
 
+        $user->notify(new ReservationNotification($reservation));
+
         return response()->json([
             'message' => 'Reservation picked up successfully',
             'reservation' => $reservation
@@ -160,6 +166,7 @@ class ReservationController extends Controller
     public function cancelReservation(CancelReservationRequest $request, Reservation $reservation)
     {
         $data = $request->validated();
+        $user = $reservation->user;
 
         if(!$reservation){
             return response()->json([
@@ -200,6 +207,8 @@ class ReservationController extends Controller
 
             DB::commit();
 
+            $user->notify(new ReservationNotification($reservation));
+
             return response()->json([
                 'message' => 'Reservation cancelled successfully',
                 'reservation' => $reservation
@@ -215,6 +224,7 @@ class ReservationController extends Controller
     public function finishReservation(FinishReservationRequest $request, Reservation $reservation)
     {
         $data = $request->validated();
+        $user = $reservation->user;
 
         if(!$reservation){
             return response()->json([
@@ -247,6 +257,8 @@ class ReservationController extends Controller
             $reservation->save();
 
             DB::commit();
+
+            $user->notify(new ReservationNotification($reservation));
 
             return response()->json([
                 'message' => 'Reservation finished successfully',
