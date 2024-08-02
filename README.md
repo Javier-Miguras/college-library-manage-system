@@ -24,6 +24,7 @@ The **College Library Manage System** is a RESTful API developed using Laravel. 
 - **Academic Program Management**: Create, update, delete, and list academic programs.
 - **Transaction Management**: Handle book loans and returns.
 - **Role-based Access Control**: Different permissions for users based on their roles (admin, employee, student).
+- **Email Notifications**: Send notifications via email for various events such as book reservations, expirations, and status updates.
 
 
 ## Requirements
