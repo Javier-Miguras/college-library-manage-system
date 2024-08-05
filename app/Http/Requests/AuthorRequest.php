@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class AuthorRequest extends FormRequest
 {
@@ -26,5 +28,14 @@ class AuthorRequest extends FormRequest
             'lastname' => ['required', 'string', 'max:60'],
             'country_id' => ['required', 'integer', 'exists:countries,id']
         ];
+    }
+
+    public function failedValidation(Validator $validator)
+    {
+        throw new HttpResponseException(response()->json([
+            'success' => false,
+            'message' => 'Validation errors',
+            'data' => $validator->errors()
+        ]));
     }
 }

@@ -2,54 +2,85 @@
 
 namespace App\Http\Controllers;
 
+use App\Classes\ApiResponseHelper;
 use App\Http\Requests\AcademicProgramRequest;
-use App\Http\Resources\AcademicProgramCollection;
 use App\Http\Resources\AcademicProgramResource;
+use App\Interfaces\AcademicProgramRepositoryInterface;
 use App\Models\AcademicProgram;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AcademicProgramController extends Controller
 {
+    private AcademicProgramRepositoryInterface $academicProgramRepositoryInterface;
+
+    public function __construct(AcademicProgramRepositoryInterface $academicProgramRepositoryInterface)
+    {
+        $this->academicProgramRepositoryInterface = $academicProgramRepositoryInterface;
+    }
+
     public function index()
     {
-        $academicPrograms = AcademicProgram::all();
+        $data = $this->academicProgramRepositoryInterface->getAll();
 
-        return response()->json([
-            "academic programs" => new AcademicProgramCollection($academicPrograms)
-        ]);
+        return ApiResponseHelper::sendResponse(AcademicProgramResource::collection($data));
     }
 
     public function store(AcademicProgramRequest $request)
     {
-        $academicProgram = AcademicProgram::create($request->validated());
+        $data = $request->validated();
 
-        return response()->json([
-            "message" => "Academic program created successfully",
-            "academic program" => new AcademicProgramResource($academicProgram)
-        ], 201);
+        DB::beginTransaction();
+
+        try {
+
+            $academicProgram = $this->academicProgramRepositoryInterface->store($data);
+
+            DB::commit();
+
+            return ApiResponseHelper::sendResponse($academicProgram, 'Academic program created successfully', 201);
+        } catch (\Exception $e) {
+            return ApiResponseHelper::rollback($e);
+        }
     }
 
-    public function show(AcademicProgram $academicProgram)
+    public function show($id)
     {
-        return response()->json([
-            "academic program" => new AcademicProgramResource($academicProgram)
-        ]);
+        $academicProgram = $this->academicProgramRepositoryInterface->getById($id);
+
+        return ApiResponseHelper::sendResponse(new AcademicProgramResource($academicProgram));
     }
 
-    public function update(AcademicProgramRequest $request, AcademicProgram $academicProgram)
+    public function update(AcademicProgramRequest $request, $id)
     {
-        $academicProgram->update($request->validated());
+        $data = $request->validated();
 
-        return response()->json([
-            "message" => "Academic program updated successfully",
-            "academic program" => new AcademicProgramResource($academicProgram)
-        ]);
+        DB::beginTransaction();
+
+        try {
+            
+            $this->academicProgramRepositoryInterface->update($id, $data);
+
+            DB::commit();
+
+            return ApiResponseHelper::sendResponse(null, 'Academic program updated successfully');
+        } catch (\Exception $e) {
+            return ApiResponseHelper::rollback($e);
+        }
     }
 
-    public function destroy(AcademicProgram $academicProgram)
+    public function destroy($id)
     {
-        $academicProgram->delete();
+        DB::beginTransaction();
 
-        return response()->noContent();
+        try {
+            $this->academicProgramRepositoryInterface->delete($id);
+
+            DB::commit();
+
+            return ApiResponseHelper::sendResponse(null, '', 204);
+        } catch (\Exception $e) {
+            return ApiResponseHelper::rollback($e);
+        }
     }
 }

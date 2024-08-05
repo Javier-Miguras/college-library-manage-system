@@ -3,7 +3,9 @@
 namespace App\Http\Requests;
 
 use Carbon\Carbon;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 class BookRequest extends FormRequest
 {
@@ -32,5 +34,14 @@ class BookRequest extends FormRequest
             'publication_year' => ['required', 'integer', 'max:' . $actualYear, 'min:0'],
             'category_id' => ['required', 'integer', 'exists:categories,id']
         ];
+    }
+
+    public function failedValidation(Validator $validator)
+    {
+        throw new HttpResponseException(response()->json([
+            'success' => false,
+            'message' => 'Validation errors',
+            'data' => $validator->errors()
+        ]));
     }
 }

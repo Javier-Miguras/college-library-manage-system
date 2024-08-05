@@ -2,54 +2,83 @@
 
 namespace App\Http\Controllers;
 
+use App\Classes\ApiResponseHelper;
 use App\Http\Requests\CityRequest;
-use App\Http\Resources\CityCollection;
 use App\Http\Resources\CityResource;
+use App\Interfaces\CityRepositoryInterface;
 use App\Models\City;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CityController extends Controller
 {
+    private CityRepositoryInterface $cityRepositoryInterface;
+
+    public function __construct(CityRepositoryInterface $cityRepositoryInterface)
+    {
+        $this->cityRepositoryInterface = $cityRepositoryInterface;
+    }
+
     public function index()
     {
-        $cities = City::all();
+        $data = $this->cityRepositoryInterface->getAll();
 
-        return response()->json([
-            "cities" => new CityCollection($cities)
-        ]);
-    }
+        return ApiResponseHelper::sendResponse(CityResource::collection($data));
+    }   
 
     public function store(CityRequest $request)
     {
-        $city = City::create($request->validated());
+        $data = $request->validated();
 
-        return response()->json([
-            "message" => "City created successfully",
-            "city" => new CityResource($city)
-        ], 201);
+        DB::beginTransaction();
+
+        try {
+            $city = $this->cityRepositoryInterface->store($data);
+
+            DB::commit();
+
+            return ApiResponseHelper::sendResponse(new CityResource($city), 'City created successfully.', 201);
+        } catch (\Exception $e) {
+            return ApiResponseHelper::rollback($e);
+        }
     }
 
-    public function show(City $city)
+    public function show($id)
     {
-        return response()->json([
-            "city" => new CityResource($city)
-        ]);
+        $city = $this->cityRepositoryInterface->getById($id);
+
+        return ApiResponseHelper::sendResponse(new CityResource($city));
     }
 
-    public function update(CityRequest $request, City $city)
+    public function update(CityRequest $request, $id)
     {
-        $city->update($request->validated());
+        $data = $request->validated();
 
-        return response()->json([
-            "message" => "City updated successfully",
-            "city" => new CityResource($city)
-        ], 200);
+        DB::beginTransaction();
+
+        try {
+            $this->cityRepositoryInterface->update($id, $data);
+
+            DB::commit();
+
+            return ApiResponseHelper::sendResponse(null, 'City updated successfully');
+        } catch (\Exception $e) {
+            return ApiResponseHelper::rollback($e);
+        }
     }
 
-    public function destroy(City $city)
+    public function destroy($id)
     {
-        $city->delete();
+        DB::beginTransaction();
 
-        return response()->noContent();
+        try {
+            $this->cityRepositoryInterface->delete($id);
+
+            DB::commit();
+
+            return ApiResponseHelper::sendResponse(null, '', 204);
+        } catch (\Exception $e) {
+            return ApiResponseHelper::rollback($e);
+        }
     }
 }

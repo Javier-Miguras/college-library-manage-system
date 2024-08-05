@@ -2,54 +2,78 @@
 
 namespace App\Http\Controllers;
 
+use App\Classes\ApiResponseHelper;
 use App\Http\Requests\CampusRequest;
-use App\Http\Resources\CampusCollection;
 use App\Http\Resources\CampusResource;
-use App\Models\Campus;
-use Illuminate\Http\Request;
+use App\Interfaces\CampusRepositoryInterface;
+use Illuminate\Support\Facades\DB;
 
 class CampusController extends Controller
 {
+    private CampusRepositoryInterface $campusRepositoryInterface;
+
+    public function __construct(CampusRepositoryInterface $campusRepositoryInterface)
+    {
+        $this->campusRepositoryInterface = $campusRepositoryInterface;
+    }
+
     public function index()
     {
-        $campus = Campus::all();
+        $data = $this->campusRepositoryInterface->getAll();
 
-        return response()->json([
-            "campus" => new CampusCollection($campus)
-        ]);
+        return ApiResponseHelper::sendResponse(CampusResource::collection($data));
     }
 
     public function store(CampusRequest $request)
     {
-        $campus = Campus::create($request->validated());
+        $data = $request->validated();
 
-        return response()->json([
-            "message" => "Campus created successfully",
-            "campus" => new CampusResource($campus)
-        ], 201);
+        DB::beginTransaction();
+
+        try {
+            $campus = $this->campusRepositoryInterface->store($data);
+            DB::commit();
+
+            return ApiResponseHelper::sendResponse(new CampusResource($campus), 'Campus created successfully.', 201);
+        } catch (\Exception $e) {
+            return ApiResponseHelper::rollback($e);
+        }
     }
 
-    public function show(Campus $campus)
+    public function show($id)
     {
-        return response()->json([
-            "campus" => new CampusResource($campus)
-        ]);
+        $campus = $this->campusRepositoryInterface->getById($id);
+
+        return ApiResponseHelper::sendResponse(new CampusResource($campus));
     }
 
-    public function update(CampusRequest $request, Campus $campus)
+    public function update($id, CampusRequest $request)
     {
-        $campus->update($request->validated());
+        $data = $request->validated();
 
-        return response()->json([
-            "message" => "Campus updated successfully",
-            "campus" => new CampusResource($campus)
-        ], 200);
+        DB::beginTransaction();
+
+        try {
+            $this->campusRepositoryInterface->update($id, $data);
+            DB::commit();
+
+            return ApiResponseHelper::sendResponse(null, 'Campus updated successfully');
+        } catch (\Exception $e) {
+            return ApiResponseHelper::rollback($e);
+        }
     }
 
-    public function destroy(Campus $campus)
+    public function destroy($id)
     {
-        $campus->delete();
+        DB::beginTransaction();
 
-        return response()->noContent();
+        try {
+            $this->campusRepositoryInterface->delete($id);
+            DB::commit();
+
+            return ApiResponseHelper::sendResponse(null, '', 204);
+        } catch (\Exception $e) {
+            return ApiResponseHelper::rollback($e);
+        }
     }
 }

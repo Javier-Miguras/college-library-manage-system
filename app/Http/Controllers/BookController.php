@@ -2,96 +2,102 @@
 
 namespace App\Http\Controllers;
 
+use App\Classes\ApiResponseHelper;
+use App\Factories\BookIndexFactory;
+use App\Factories\BookShowFactory;
+use App\Factories\BookStockFactory;
 use App\Http\Requests\BookRequest;
-use App\Http\Resources\BookAdminCollection;
-use App\Http\Resources\BookCollection;
 use App\Http\Resources\BookResource;
-use App\Models\Book;
+use App\Interfaces\BookRepositoryInterface;
+use App\Interfaces\BookStockRepositoryInterface;
+use App\Interfaces\CampusRepositoryInterface;
 use App\Models\BookStock;
-use App\Models\Campus;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class BookController extends Controller
 {
+    private BookRepositoryInterface $bookRepositoryInterface;
+    private CampusRepositoryInterface $campusRepositoryInterface;
+    private BookStockRepositoryInterface $bookStockRepositoryInterface;
+
+    public function __construct(
+        BookRepositoryInterface $bookRepositoryInterface, 
+        CampusRepositoryInterface $campusRepositoryInterface, 
+        BookStockRepositoryInterface $bookStockRepositoryInterface
+    )
+    {
+        $this->bookRepositoryInterface = $bookRepositoryInterface;
+        $this->campusRepositoryInterface = $campusRepositoryInterface;
+        $this->bookStockRepositoryInterface = $bookStockRepositoryInterface;
+    }
+
     public function index()
     {
-        $books = Book::all();
-
-        if(Auth::user()->role == 2){
-            return response()->json([
-                "books" => new BookAdminCollection($books)
-            ]);
-        }
-
-        $campus = Auth::user()->campus;
-        $booksStock = $campus->booksStock()->get()->keyBy('book_id');
-
-        // Asocia el stock a cada libro
-        $booksWithStock = $books->map(function ($book) use ($booksStock) {
-            // Encuentra el stock correspondiente al libro
-            $bookStock = $booksStock->get($book->id);
-            // Asigna el stock al libro
-            $book->stock = $bookStock ? $bookStock->stock : 0;
-            return $book;
-        });
-
-        return response()->json([
-            "books" => new BookCollection($booksWithStock) 
-        ]);
+        $data = BookIndexFactory::make($this->bookRepositoryInterface->getAll());
+       
+        return ApiResponseHelper::sendResponse($data);
         
     }
 
     public function store(BookRequest $request)
     {
-        $book = Book::create($request->validated());
-        $campusList = Campus::all();
+        $data = $request->validated();
+        $campusList = $this->campusRepositoryInterface->getAll();
 
-        foreach($campusList as $campus){
-            $bookStock = new BookStock;
+        DB::beginTransaction();
 
-            $bookStock->stock = 0;
-            $bookStock->campus_id = $campus->id;
-            $bookStock->book_id = $book->id;
+        try {
+            $book = $this->bookRepositoryInterface->store($data);
 
-            $bookStock->save();
+            foreach($campusList as $campus){
+                $bookStockData = BookStockFactory::make($campus, $book);
+    
+                $this->bookStockRepositoryInterface->store($bookStockData);
+            }
+
+            DB::commit();
+            return ApiResponseHelper::sendResponse(new BookResource($book), 'Book created successfully.', 201);
+
+        } catch (\Exception $e) {
+            return ApiResponseHelper::rollback($e);
         }
-        
-        return response()->json([
-            "message" => "Book created successfully",
-            "book" => new BookResource($book)
-        ], 201);
+
     }
 
-    public function show(Book $book)
+    public function show($id)
     {
-        if(Auth::user()->role == 2){
-            return response()->json([
-                "book" => new BookResource($book)
-            ]);
-        }else{
-            $stock = $book->stock->where('campus_id', Auth::user()->campus->id)->first()->stock;
-            $book->stock = $stock;
-            return response()->json([
-                "book" => new BookResource($book)
-            ]);
+        $book = $this->bookRepositoryInterface->getById($id);
+
+        return ApiResponseHelper::sendResponse(BookShowFactory::make($book));
+    }
+
+    public function update(BookRequest $request, $id)
+    {
+        $data = $request->validated();
+
+        DB::beginTransaction();
+
+        try {
+            $this->bookRepositoryInterface->update($id, $data);
+            DB::commit();
+
+            return ApiResponseHelper::sendResponse(null, 'Book updated successfully.');
+        } catch (\Exception $e) {
+            return ApiResponseHelper::rollback($e);
         }
     }
 
-    public function update(BookRequest $request, Book $book)
+    public function destroy($id)
     {
-        $book->update($request->validated());
+        DB::beginTransaction();
 
-        return response()->json([
-            "message" => "Book updated successfully",
-            "book" => new BookResource($book)
-        ], 200);
-    }
+        try {
+            $this->bookRepositoryInterface->delete($id);
+            DB::commit();
 
-    public function destroy(Book $book)
-    {
-        $book->delete();
-
-        return response()->noContent();  //return 204
+            return ApiResponseHelper::sendResponse(null, '', 204);
+        } catch (\Exception $e) {
+            return ApiResponseHelper::rollback($e);
+        }
     }
 }
