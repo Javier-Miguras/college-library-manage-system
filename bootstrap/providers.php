@@ -9,4 +9,5 @@ return [
     App\Providers\CampusServiceProvider::class,
     App\Providers\CategoryServiceProvider::class,
     App\Providers\CityServiceProvider::class,
+    App\Providers\TownServiceProvider::class,
 ];

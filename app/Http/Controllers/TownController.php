@@ -2,54 +2,81 @@
 
 namespace App\Http\Controllers;
 
+use App\Classes\ApiResponseHelper;
 use App\Http\Requests\TownRequest;
 use App\Http\Resources\TownCollection;
 use App\Http\Resources\TownResource;
+use App\Interfaces\TownRepositoryInterface;
 use App\Models\Town;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class TownController extends Controller
 {
+    private TownRepositoryInterface $townRepositoryInterface;
+
+    public function __construct(TownRepositoryInterface $townRepositoryInterface)
+    {
+        $this->townRepositoryInterface = $townRepositoryInterface;
+    }
+
     public function index()
     {
-        $towns = Town::all();
+        $data = $this->townRepositoryInterface->getAll();
 
-        return response()->json([
-            "towns" => new TownCollection($towns)
-        ]);
+        return ApiResponseHelper::sendResponse(TownResource::collection($data));
     }
 
     public function store(TownRequest $request)
     {
-        $town = Town::create($request->validated());
+        $data = $request->validated();
 
-        return response()->json([
-            "message" => "Town created successfully",
-            "town" => new TownResource($town)
-        ], 201);
+        DB::beginTransaction();
+
+        try {
+            $town = $this->townRepositoryInterface->store($data);
+            DB::commit();
+
+            return ApiResponseHelper::sendResponse(new TownResource($town), 'Town created successfully.', 201);
+        } catch (\Exception $e) {
+            return ApiResponseHelper::rollback($e);
+        }
     }
 
-    public function show(Town $town)
+    public function show($id)
     {
-        return response()->json([
-            "town" => new TownResource($town)
-        ]);
+        $town = $this->townRepositoryInterface->getById($id);
+
+        return ApiResponseHelper::sendResponse(new TownResource($town));
     }
 
-    public function update(TownRequest $request, Town $town)
+    public function update($id, TownRequest $request)
     {
-        $town->update($request->validated());
+        $data = $request->validated();
 
-        return response()->json([
-            "message" => "Town updated successfully",
-            "town" => new TownResource($town)
-        ], 200);
+        DB::beginTransaction();
+
+        try {
+            $this->townRepositoryInterface->update($id, $data);
+            DB::commit();
+
+            return ApiResponseHelper::sendResponse(null, 'Town updated successfully');
+        } catch (\Exception $e) {
+            return ApiResponseHelper::rollback($e);
+        }
     }
 
-    public function destroy(Town $town)
+    public function destroy($id)
     {
-        $town->delete();
+        DB::beginTransaction();
 
-        return response()->noContent();
+        try {
+            $this->townRepositoryInterface->delete($id);
+            DB::commit();
+
+            return ApiResponseHelper::sendResponse(null, '', 204);
+        } catch (\Exception $e) {
+            DB::rollBack($e);
+        }
     }
 }
